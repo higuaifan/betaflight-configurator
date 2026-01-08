@@ -24,9 +24,11 @@ jobs:
           $version = "0.72.0"
           $arch = "win-x64"
           $cacheDir = "cache/$version-normal"
+          $platformDir = Join-Path $cacheDir $arch
           $zip = "nwjs-v$version-$arch.zip"
           New-Item -ItemType Directory -Force $cacheDir | Out-Null
-          $dest = Join-Path $cacheDir $zip
+          New-Item -ItemType Directory -Force $platformDir | Out-Null
+          $dest = Join-Path $platformDir $zip
           if (-Not (Test-Path $dest)) {
             $url = "https://dl.nwjs.io/v$version/$zip"
             $max = 3
@@ -40,6 +42,11 @@ jobs:
                 Start-Sleep -Seconds 5
               }
             }
+          }
+          $extractPath = Join-Path $platformDir "nwjs-v$version-$arch"
+          if (-Not (Test-Path $extractPath)) {
+            Write-Host "Extracting $dest..."
+            Expand-Archive -Path $dest -DestinationPath $platformDir
           }
 
       - name: Cache node_modules
