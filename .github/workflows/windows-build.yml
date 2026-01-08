@@ -53,6 +53,9 @@ jobs:
               Remove-Item -Path $extractPath -Recurse -Force
             }
           }
+          if (Test-Path $dest) {
+            Remove-Item -Path $dest -Force
+          }
 
       - name: Cache node_modules
         uses: actions/cache@v4
