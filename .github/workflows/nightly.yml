@@ -15,10 +15,7 @@ env:
 name: Nightly
 
 on:
-  push:
-    branches:
-      - master
-      - '*-maintenance'
+  workflow_dispatch:
 
 jobs:
   ci:
