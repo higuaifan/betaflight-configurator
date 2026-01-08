@@ -22,20 +22,22 @@ jobs:
         shell: pwsh
         run: |
           $version = "0.72.0"
-          $arch = "win-x64"
-          $cacheDir = "cache/$version-normal"
-          $platformDir = Join-Path $cacheDir $arch
-          $zip = "nwjs-v$version-$arch.zip"
-          New-Item -ItemType Directory -Force $cacheDir | Out-Null
-          New-Item -ItemType Directory -Force $platformDir | Out-Null
-          $dest = Join-Path $platformDir $zip
+          $flavor = "normal"
+          $plat = "win"
+          $arch = "x64"
+          $osName = "win64"
+          $cacheRoot = "cache/$version-$flavor/$osName"
+          $targetDir = Join-Path $cacheRoot "nwjs-$flavor-v$version-$plat-$arch"
+          $zip = "nwjs-v$version-$plat-$arch.zip"
+          $releaseUrl = "https://github.com/higuaifan/betaflight-configurator/releases/download/nwjs-cache/$zip"
+          New-Item -ItemType Directory -Force $cacheRoot | Out-Null
+          $dest = Join-Path $cacheRoot $zip
           if (-Not (Test-Path $dest)) {
-            $url = "https://dl.nwjs.io/v$version/$zip"
             $max = 3
             for ($i = 1; $i -le $max; $i++) {
               try {
-                Write-Host "Downloading $url (attempt $i/$max)..."
-                Invoke-WebRequest -Uri $url -OutFile $dest
+                Write-Host "Downloading $releaseUrl (attempt $i/$max)..."
+                Invoke-WebRequest -Uri $releaseUrl -OutFile $dest
                 break
               } catch {
                 if ($i -eq $max) { throw }
@@ -43,10 +45,13 @@ jobs:
               }
             }
           }
-          $extractPath = Join-Path $platformDir "nwjs-v$version-$arch"
-          if (-Not (Test-Path $extractPath)) {
+          $extractPath = Join-Path $cacheRoot "nwjs-v$version-$plat-$arch"
+          if (-Not (Test-Path $targetDir)) {
             Write-Host "Extracting $dest..."
-            Expand-Archive -Path $dest -DestinationPath $platformDir
+            Expand-Archive -Path $dest -DestinationPath $cacheRoot
+            if (Test-Path $extractPath) {
+              Rename-Item -Path $extractPath -NewName (Split-Path $targetDir -Leaf)
+            }
           }
 
       - name: Cache node_modules

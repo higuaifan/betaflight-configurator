@@ -51,7 +51,6 @@ const nwBuilderOptions = {
     macIcns: './src/images/bf_icon.icns',
     macPlist: { 'CFBundleDisplayName': 'Betaflight Configurator'},
     winIco: './src/images/bf_icon.ico',
-    downloadUrl: 'https://github.com/nwjs/nw.js/releases/download',
     zip: false,
 };
 
