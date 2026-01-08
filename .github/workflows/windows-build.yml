@@ -18,6 +18,30 @@ jobs:
           path: cache/
           key: nwjs-release-${{ runner.os }}-${{ hashFiles('gulpfile.js') }}
 
+      - name: Prefetch NW.js
+        shell: pwsh
+        run: |
+          $version = "0.72.0"
+          $arch = "win-x64"
+          $cacheDir = "cache/$version-normal"
+          $zip = "nwjs-v$version-$arch.zip"
+          New-Item -ItemType Directory -Force $cacheDir | Out-Null
+          $dest = Join-Path $cacheDir $zip
+          if (-Not (Test-Path $dest)) {
+            $url = "https://dl.nwjs.io/v$version/$zip"
+            $max = 3
+            for ($i = 1; $i -le $max; $i++) {
+              try {
+                Write-Host "Downloading $url (attempt $i/$max)..."
+                Invoke-WebRequest -Uri $url -OutFile $dest
+                break
+              } catch {
+                if ($i -eq $max) { throw }
+                Start-Sleep -Seconds 5
+              }
+            }
+          }
+
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
