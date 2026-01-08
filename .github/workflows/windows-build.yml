@@ -27,7 +27,6 @@ jobs:
           $arch = "x64"
           $osName = "win64"
           $cacheRoot = "cache/$version-$flavor/$osName"
-          $targetDir = Join-Path $cacheRoot "nwjs-$flavor-v$version-$plat-$arch"
           $zip = "nwjs-v$version-$plat-$arch.zip"
           $releaseUrl = "https://github.com/higuaifan/betaflight-configurator/releases/download/nwjs-cache/$zip"
           New-Item -ItemType Directory -Force $cacheRoot | Out-Null
@@ -46,11 +45,12 @@ jobs:
             }
           }
           $extractPath = Join-Path $cacheRoot "nwjs-v$version-$plat-$arch"
-          if (-Not (Test-Path $targetDir)) {
+          if (-Not (Test-Path (Join-Path $cacheRoot "nw.exe"))) {
             Write-Host "Extracting $dest..."
             Expand-Archive -Path $dest -DestinationPath $cacheRoot
             if (Test-Path $extractPath) {
-              Rename-Item -Path $extractPath -NewName (Split-Path $targetDir -Leaf)
+              Get-ChildItem -Path $extractPath -Force | Move-Item -Destination $cacheRoot -Force
+              Remove-Item -Path $extractPath -Recurse -Force
             }
           }
 
