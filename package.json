@@ -40,7 +40,10 @@
     "type": "git",
     "url": "https://github.com/higuaifan/betaflight-configurator.git"
   },
-  "author": "The Betaflight open source project.",
+  "author": {
+    "name": "The Betaflight open source project",
+    "email": "betaflight@betaflight.com"
+  },
   "license": "GPL-3.0",
   "engines": {
     "node": "24.x"
