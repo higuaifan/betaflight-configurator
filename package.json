@@ -5,7 +5,7 @@
   "description": "Crossplatform configuration and management application for the Betaflight flight control firmware.",
   "version": "2026.6.0-alpha",
   "type": "module",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

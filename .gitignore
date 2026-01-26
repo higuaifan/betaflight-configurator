@@ -56,3 +56,8 @@ capacitor-plugins/*/android/bin/
 /CLAUDE.md
 /.claude
 /AGENTS.md
+
+# Build artifacts
+_artifacts/
+nw-builder-*.tgz
+/package/
