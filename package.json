@@ -38,7 +38,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "github.com/betaflight/betaflight-configurator"
+    "url": "https://github.com/higuaifan/betaflight-configurator.git"
   },
   "author": "The Betaflight open source project.",
   "license": "GPL-3.0",
