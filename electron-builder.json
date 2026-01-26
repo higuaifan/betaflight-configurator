@@ -22,23 +22,20 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "src/images/bf_icon_128.png"
+    "icon": "src/images/pwa/pwa-512-512.png"
   },
   "nsis": {
     "oneClick": false,
-    "allowToChangeInstallationDirectory": true,
-    "installerIcon": "src/images/bf_icon_128.png",
-    "uninstallerIcon": "src/images/bf_icon_128.png",
-    "installerHeaderIcon": "src/images/bf_icon_128.png"
+    "allowToChangeInstallationDirectory": true
   },
   "mac": {
     "target": ["dmg"],
-    "icon": "src/images/bf_icon_128.png",
+    "icon": "src/images/pwa/pwa-512-512.png",
     "category": "public.app-category.utilities"
   },
   "linux": {
     "target": ["AppImage", "deb"],
-    "icon": "src/images/bf_icon_128.png",
+    "icon": "src/images/pwa/pwa-512-512.png",
     "category": "Utility"
   }
 }
