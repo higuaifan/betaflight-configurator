@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.betaflight.configurator",
+  "productName": "Betaflight Configurator",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "src/dist/**/*",
+    "electron/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "src/images/bf_icon_128.png"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "src/images/bf_icon_128.png",
+    "uninstallerIcon": "src/images/bf_icon_128.png",
+    "installerHeaderIcon": "src/images/bf_icon_128.png"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "src/images/bf_icon_128.png",
+    "category": "public.app-category.utilities"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "src/images/bf_icon_128.png",
+    "category": "Utility"
+  }
+}
