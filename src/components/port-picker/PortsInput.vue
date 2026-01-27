@@ -8,6 +8,7 @@
                 :title="$t('firmwareFlasherManualPort')"
                 :disabled="disabled"
                 @change="onChangePort"
+                @focus="onFocusPort"
             >
                 <option value="noselection" disabled>
                     {{ $t("portsSelectNoSelection") }}
@@ -42,7 +43,7 @@
                 >
                     {{ connectedUsbDevice.displayName }}
                 </option>
-                <option v-if="showSerialOption" value="requestpermissionserial">
+                <option v-if="showSerialOption && !isElectron" value="requestpermissionserial">
                     {{ $t("portsSelectPermission") }}
                 </option>
                 <option v-if="showBluetoothOption" value="requestpermissionbluetooth">
@@ -86,9 +87,10 @@
 </template>
 
 <script>
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent, ref, watch, computed } from "vue";
 import { set as setConfig } from "../../js/ConfigStorage";
 import { EventBus } from "../eventBus";
+import { isElectron } from "../../js/utils/checkCompatibility.js";
 
 export default defineComponent({
     props: {
@@ -185,12 +187,24 @@ export default defineComponent({
             }
         };
 
+        // Electron 环境下，下拉框获得焦点时触发串口扫描（作为启动自动扫描的保底机制）
+        const onFocusPort = () => {
+            if (isElectron()) {
+                EventBus.$emit("ports-input:refresh-serial");
+            }
+        };
+
+        // Electron 环境下不需要请求权限按钮
+        const isElectronEnv = computed(() => isElectron());
+
         return {
             selectedPort,
             selectedBauds,
             autoConnect,
             baudRates,
             onChangePort,
+            onFocusPort,
+            isElectron: isElectronEnv,
         };
     },
 });

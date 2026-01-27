@@ -53,6 +53,10 @@ export function isIOS() {
     return false;
 }
 
+export function isElectron() {
+    return window.electronAPI?.isElectron === true;
+}
+
 export function checkCompatibility() {
     const hasSerialSupport = checkSerialSupport();
     const hasBluetoothSupport = checkBluetoothSupport();

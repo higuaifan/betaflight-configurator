@@ -207,6 +207,17 @@ class Serial extends EventTarget {
     }
 
     /**
+     * Electron 专用：触发串口扫描
+     * 通过调用 WebSerial 的 triggerElectronPortScan 方法来触发 main 进程扫描串口
+     */
+    async triggerElectronPortScan() {
+        const serialProtocol = this._protocols.find((p) => p.name === "serial")?.instance;
+        if (serialProtocol?.triggerElectronPortScan) {
+            await serialProtocol.triggerElectronPortScan();
+        }
+    }
+
+    /**
      * Get connection status
      */
     get connected() {

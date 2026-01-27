@@ -1,5 +1,6 @@
 import { webSerialDevices, vendorIdNames } from "./devices";
 import GUI from "../gui";
+import { isElectron } from "../utils/checkCompatibility.js";
 
 const logHead = "[WEBSERIAL]";
 
@@ -71,7 +72,63 @@ class WebSerial extends EventTarget {
         navigator.serial.addEventListener("disconnect", (e) => this.handleRemovedDevice(e.target));
 
         this.isNeedBatchWrite = false;
+
+        // Electron 环境下设置串口列表更新监听
+        if (isElectron()) {
+            console.log(`${logHead} Running in Electron mode`);
+            window.electronAPI.serial.onPortsUpdated((ports) => {
+                console.log(`${logHead} Electron ports updated:`, ports);
+                const oldPorts = this.ports;
+                const newPorts = ports.map((port) => this.createElectronPort(port));
+                this.electronPorts = ports;
+
+                // 计算新增和移除的端口，分别触发事件
+                const oldIds = new Set(oldPorts.map((p) => p.path));
+                const newIds = new Set(newPorts.map((p) => p.path));
+
+                // 触发移除事件
+                oldPorts.forEach((port) => {
+                    if (!newIds.has(port.path)) {
+                        this.dispatchEvent(new CustomEvent("removedDevice", { detail: port }));
+                    }
+                });
+
+                // 更新端口列表
+                this.ports = newPorts;
+
+                // 触发添加事件
+                newPorts.forEach((port) => {
+                    if (!oldIds.has(port.path)) {
+                        this.dispatchEvent(new CustomEvent("addedDevice", { detail: port }));
+                    }
+                });
+            });
+            this.electronPorts = [];
+
+            // 启动时尝试自动扫描（能成功就成功，失败也无所谓，下拉框焦点会再次触发）
+            this.triggerElectronPortScan();
+        }
+
         this.loadDevices();
+    }
+
+    /**
+     * Electron 专用：触发串口扫描
+     * 通过调用 requestPort() 触发 select-serial-port 事件，让 main 进程获取端口列表
+     * 注意：这是利用副作用的方式，requestPort() 本身会失败（因为我们不预选端口），但事件会触发
+     */
+    async triggerElectronPortScan() {
+        if (!isElectron()) {
+            return;
+        }
+        try {
+            console.log(`${logHead} Electron: triggering port scan`);
+            await navigator.serial.requestPort({});
+        } catch {
+            // 预期会失败（因为没有预选端口），但 select-serial-port 事件已经触发
+            // main 进程会在事件中获取端口列表并通过 IPC 通知我们
+            console.log(`${logHead} Electron: port scan triggered (rejection is expected)`);
+        }
     }
 
     handleNewDevice(device) {
@@ -116,30 +173,82 @@ class WebSerial extends EventTarget {
 
     async loadDevices() {
         try {
-            const ports = await navigator.serial.getPorts();
-            this.ports = ports.map((port) => this.createPort(port));
+            if (isElectron()) {
+                // Electron 模式下使用 IPC 获取串口列表
+                const electronPorts = await window.electronAPI.serial.listPorts();
+                this.electronPorts = electronPorts;
+                this.ports = electronPorts.map((port) => this.createElectronPort(port));
+                console.log(`${logHead} Loaded ${this.ports.length} ports via Electron IPC`);
+            } else {
+                const ports = await navigator.serial.getPorts();
+                this.ports = ports.map((port) => this.createPort(port));
+            }
         } catch (error) {
             console.error(`${logHead} Error loading devices:`, error);
         }
+    }
+
+    // 将 Electron 串口格式转换为应用内部格式
+    createElectronPort(electronPort) {
+        const displayName = vendorIdNames[electronPort.vendorId]
+            ? vendorIdNames[electronPort.vendorId]
+            : electronPort.displayName || `VID:${electronPort.vendorId} PID:${electronPort.productId}`;
+        return {
+            path: electronPort.portId,
+            displayName: `Betaflight ${displayName}`,
+            vendorId: electronPort.vendorId,
+            productId: electronPort.productId,
+            electronPortId: electronPort.portId,
+        };
     }
 
     async requestPermissionDevice(showAllSerialDevices = false) {
         let newPermissionPort = null;
 
         try {
-            const options = showAllSerialDevices ? {} : { filters: webSerialDevices };
-            const userSelectedPort = await navigator.serial.requestPort(options);
+            if (isElectron()) {
+                // Electron 模式下，触发 requestPort 来刷新串口列表
+                // main 进程会捕获 select-serial-port 事件并更新缓存
+                try {
+                    await navigator.serial.requestPort({});
+                } catch {
+                    // 预期会抛出错误（因为没有预选端口），忽略
+                }
+                // 刷新设备列表
+                await this.loadDevices();
+                // Electron 模式下不自动选择设备，返回 null 让用户从下拉框选择
+                console.info(`${logHead} Electron: refreshed port list, found ${this.ports.length} ports`);
+                newPermissionPort = null;
+            } else {
+                const options = showAllSerialDevices ? {} : { filters: webSerialDevices };
+                const userSelectedPort = await navigator.serial.requestPort(options);
 
-            newPermissionPort = this.ports.find((port) => port.port === userSelectedPort);
+                newPermissionPort = this.ports.find((port) => port.port === userSelectedPort);
 
-            if (!newPermissionPort) {
-                newPermissionPort = this.handleNewDevice(userSelectedPort);
+                if (!newPermissionPort) {
+                    newPermissionPort = this.handleNewDevice(userSelectedPort);
+                }
+                console.info(`${logHead} User selected SERIAL device from permissions:`, newPermissionPort.path);
             }
-            console.info(`${logHead} User selected SERIAL device from permissions:`, newPermissionPort.path);
         } catch (error) {
             console.error(`${logHead} User didn't select any SERIAL device when requesting permission:`, error);
         }
         return newPermissionPort;
+    }
+
+    // Electron 专用：通过 portId 获取真实的串口对象
+    async getElectronSerialPort(portId) {
+        try {
+            // 先告诉 main 进程我们要选择哪个端口
+            await window.electronAPI.serial.selectPort(portId);
+            // 然后调用 requestPort 触发 select-serial-port 事件
+            // main 进程会用预选的 portId 回调
+            const port = await navigator.serial.requestPort({});
+            return port;
+        } catch (error) {
+            console.error(`${logHead} Error getting Electron serial port:`, error);
+            return null;
+        }
     }
 
     async getDevices() {
@@ -165,7 +274,19 @@ class WebSerial extends EventTarget {
                 return false;
             }
 
-            this.port = device.port;
+            // Electron 模式下需要通过 IPC 获取真实的串口对象
+            if (isElectron()) {
+                const electronPortId = device.electronPortId || device.path;
+                console.log(`${logHead} Electron: requesting port with ID:`, electronPortId);
+                this.port = await this.getElectronSerialPort(electronPortId);
+                if (!this.port) {
+                    console.error(`${logHead} Electron: failed to get serial port`);
+                    this.dispatchEvent(new CustomEvent("connect", { detail: false }));
+                    return false;
+                }
+            } else {
+                this.port = device.port;
+            }
 
             await this.port.open(options);
 

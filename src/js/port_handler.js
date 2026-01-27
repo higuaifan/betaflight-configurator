@@ -8,6 +8,7 @@ import {
     checkBluetoothSupport,
     checkSerialSupport,
     checkUsbSupport,
+    isElectron,
 } from "./utils/checkCompatibility.js";
 
 const DEFAULT_PORT = "noselection";
@@ -54,6 +55,9 @@ PortHandler.initialize = function () {
     EventBus.$on("ports-input:request-permission-serial", () => this.requestDevicePermission("serial"));
     EventBus.$on("ports-input:request-permission-usb", () => this.requestDevicePermission("usb"));
     EventBus.$on("ports-input:change", this.onChangeSelectedPort.bind(this));
+
+    // Electron 环境下，下拉框焦点触发串口刷新（作为启动自动扫描的保底机制）
+    EventBus.$on("ports-input:refresh-serial", () => this.refreshElectronSerialPorts());
 
     // Use serial for all protocol events
     serial.addEventListener("addedDevice", (event) => {
@@ -195,6 +199,28 @@ PortHandler.requestDevicePermission = async function (protocol) {
         }
     } catch (error) {
         console.error(`${this.logHead} Error requesting permission for ${protocol} device:`, error);
+    }
+};
+
+/**
+ * Electron 专用：刷新串口列表
+ * 通过触发 requestPort() 来让 main 进程扫描串口
+ * 这是下拉框焦点触发的保底机制，确保用户一定能看到串口列表
+ */
+PortHandler.refreshElectronSerialPorts = async function () {
+    if (!isElectron()) {
+        return;
+    }
+
+    try {
+        console.log(`${this.logHead} Electron: refreshing serial ports via user interaction`);
+        // 调用 serial 的扫描方法
+        await serial.triggerElectronPortScan?.();
+        // 更新设备列表
+        await this.updateDeviceList("serial");
+        this.selectActivePort();
+    } catch (error) {
+        console.error(`${this.logHead} Error refreshing Electron serial ports:`, error);
     }
 };
 
