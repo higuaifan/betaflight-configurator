@@ -1,5 +1,4 @@
-import { webSerialDevices, serialDevices, vendorIdNames } from "./devices";
-import { get as getConfig } from "../ConfigStorage";
+import { webSerialDevices, vendorIdNames } from "./devices";
 import GUI from "../gui";
 import { isElectron } from "../utils/checkCompatibility.js";
 
@@ -78,14 +77,11 @@ class WebSerial extends EventTarget {
         if (isElectron()) {
             console.log(`${logHead} Running in Electron mode`);
             window.electronAPI.serial.onPortsUpdated((ports) => {
-                console.log(`${logHead} Electron ports updated (raw):`, ports.length);
-                // 过滤已知飞控设备
-                const filteredPorts = this.filterElectronPorts(ports);
-                console.log(`${logHead} Electron ports after filter:`, filteredPorts.length);
+                console.log(`${logHead} Electron ports updated:`, ports.length);
 
                 const oldPorts = this.ports;
-                const newPorts = filteredPorts.map((port) => this.createElectronPort(port));
-                this.electronPorts = filteredPorts;
+                const newPorts = ports.map((port) => this.createElectronPort(port));
+                this.electronPorts = ports;
 
                 // 计算新增和移除的端口，分别触发事件
                 const oldIds = new Set(oldPorts.map((p) => p.path));
@@ -180,14 +176,10 @@ class WebSerial extends EventTarget {
         try {
             if (isElectron()) {
                 // Electron 模式下使用 IPC 获取串口列表
-                const rawPorts = await window.electronAPI.serial.listPorts();
-                // 过滤已知飞控设备
-                const electronPorts = this.filterElectronPorts(rawPorts);
+                const electronPorts = await window.electronAPI.serial.listPorts();
                 this.electronPorts = electronPorts;
                 this.ports = electronPorts.map((port) => this.createElectronPort(port));
-                console.log(
-                    `${logHead} Loaded ${this.ports.length} ports via Electron IPC (filtered from ${rawPorts.length})`,
-                );
+                console.log(`${logHead} Loaded ${this.ports.length} ports via Electron IPC`);
             } else {
                 const ports = await navigator.serial.getPorts();
                 this.ports = ports.map((port) => this.createPort(port));
@@ -209,24 +201,6 @@ class WebSerial extends EventTarget {
             productId: electronPort.productId,
             electronPortId: electronPort.portId,
         };
-    }
-
-    /**
-     * Electron 专用：过滤已知飞控设备
-     * 基于 serialDevices 中的 vendorId/productId 列表过滤
-     * 如果 showAllSerialDevices 设置为 true，则显示所有设备
-     */
-    filterElectronPorts(ports) {
-        const showAll = getConfig("showAllSerialDevices", false).showAllSerialDevices;
-        if (showAll) {
-            return ports;
-        }
-        return ports.filter((port) => {
-            // 检查是否匹配已知飞控设备
-            return serialDevices.some(
-                (device) => device.vendorId === port.vendorId && device.productId === port.productId,
-            );
-        });
     }
 
     async requestPermissionDevice(showAllSerialDevices = false) {
