@@ -7,7 +7,13 @@
             <div v-if="state.flashingInProgress" class="data-loading flashing-wait">
                 <p>{{ state.progressLabelText }} {{ $t("firmwareFlasherPleaseWait") }}</p>
             </div>
-            <template v-else>
+            <!-- Centered DFU permission button shown under the spinner -->
+            <div v-if="state.dfuAuthRequired" class="dfu-auth-request">
+                <button type="button" class="button dfu-permission" @click="requestDfuPermission">
+                    {{ $t("firmwareFlasherClickToConnectDfu") || "Click to connect DFU" }}
+                </button>
+            </div>
+            <template v-if="!state.dfuAuthRequired">
                 <div class="grid-box-spacer"></div>
                 <div class="grid-box col2">
                     <div class="options gui_box col-span-1">
@@ -255,7 +261,6 @@
                                         ref="corebuildModeCheckbox"
                                         class="corebuild_mode vue-switch-input"
                                         type="checkbox"
-                                        @change="handleCoreBuildModeChange"
                                     />
                                     <span class="vue-switch-slider" aria-hidden="true"></span>
                                     <span id="build_configuration_toggle_label_text" class="vue-switch-text">{{
@@ -267,7 +272,7 @@
                             <div class="spacer_box_title" v-html="$t('firmwareFlasherBuildConfigurationHead')"></div>
                         </div>
                         <div class="grid-box col1">
-                            <div class="spacer hide-in-core-build-mode">
+                            <div v-show="!state.coreBuildMode" class="spacer">
                                 <div class="grid-box col2">
                                     <div class="select-group">
                                         <strong>{{ $t("firmwareFlasherBuildRadioProtocols") }}</strong>
@@ -313,7 +318,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="spacer hide-in-core-build-mode">
+                            <div v-show="!state.coreBuildMode" class="spacer">
                                 <div class="grid-box col2">
                                     <div class="select-group">
                                         <strong>{{ $t("firmwareFlasherBuildOsdProtocols") }}</strong>
@@ -359,7 +364,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="spacer hide-in-core-build-mode">
+                            <div v-show="!state.coreBuildMode" class="spacer">
                                 <div class="grid-box col1">
                                     <div class="select-group">
                                         <strong>{{ $t("firmwareFlasherBuildOptions") }}</strong>
@@ -383,7 +388,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="expertOptions spacer hide-in-core-build-mode">
+                            <div v-show="!state.coreBuildMode" class="expertOptions spacer">
                                 <div class="grid-box col1">
                                     <div class="select-group">
                                         <strong>{{ $t("firmwareFlasherBuildCustomDefines") }}</strong>
@@ -402,10 +407,14 @@
                                                 v-model="state.selectedCommit"
                                                 :options="state.commitOptions"
                                                 :show-labels="false"
-                                                placeholder="Select branch"
+                                                :searchable="true"
+                                                :taggable="true"
+                                                :internal-search="true"
+                                                placeholder="Select branch or enter PR # / commit hash"
                                                 track-by="value"
                                                 label="label"
                                                 @input="onCommitChange"
+                                                @tag="onCommitTag"
                                                 class="standard-select"
                                             />
                                         </div>
@@ -701,6 +710,7 @@ import { EventBus } from "../eventBus";
 import { ispConnected } from "../../js/utils/connection.js";
 import FC from "../../js/fc";
 import SponsorTile from "../sponsor/SponsorTile.vue";
+import DFU from "../../js/protocols/webusbdfu";
 
 export default defineComponent({
     name: "FirmwareFlasherTab",
@@ -765,7 +775,6 @@ export default defineComponent({
             targetQualificationVisible: false,
             expertOptionsVisible: false,
             buildTypeRowVisible: false,
-            hideInCoreBuildMode: true,
             commitSelectionVisible: false,
             // UI State - Text content
             targetQualificationText: "",
@@ -786,6 +795,8 @@ export default defineComponent({
             // Dialog states
             dialogUnstableFirmwareAcknowledgementCheckbox: false,
             flashingInProgress: false,
+            // UI State - DFU authorization required (show button to request permissions)
+            dfuAuthRequired: false,
         });
 
         // Template refs for all interactive elements
@@ -939,6 +950,23 @@ export default defineComponent({
             }
 
             sponsorTile.value?.resume();
+        };
+
+        // Called by webstm32 when a DFU device requires user authorization
+        const requestDfuPermission = async () => {
+            try {
+                const device = await DFU.requestPermission();
+                if (device) {
+                    console.log("DFU permission granted via UI", device);
+                    state.dfuAuthRequired = false;
+                } else {
+                    console.log("DFU permission not granted by user");
+                    state.dfuAuthRequired = true; // allow retry
+                }
+            } catch (e) {
+                console.error("DFU permission request failed", e);
+                state.dfuAuthRequired = true; // allow retry
+            }
         };
 
         const preservePreFlashingState = () => {
@@ -1199,7 +1227,11 @@ export default defineComponent({
             });
 
             data.generalOptions = data.generalOptions.map((option) => {
-                option.default = option.default || state.cloudBuildOptions?.includes(option.value);
+                // If using autodetect (cloudBuildOptions set), only mark as default if present in cloudBuildOptions
+                option.default =
+                    state.cloudBuildOptions.length > 0
+                        ? state.cloudBuildOptions.includes(option.value)
+                        : option.default || false;
                 return option;
             });
 
@@ -1324,7 +1356,6 @@ export default defineComponent({
 
             // Setup expert options visibility
             state.expertOptionsVisible = state.expertMode;
-            state.hideInCoreBuildMode = true;
 
             // Restore selected build type and trigger initial load
             const selectedBuildType = getConfig("selected_build_type").selected_build_type || 0;
@@ -1539,6 +1570,14 @@ export default defineComponent({
                 flashingMessage,
                 flashProgress,
                 cleanup,
+                showDfuPermission: () => {
+                    state.dfuAuthRequired = true;
+                    return TABS.firmware_flasher;
+                },
+                hideDfuPermission: () => {
+                    state.dfuAuthRequired = false;
+                    return TABS.firmware_flasher;
+                },
                 FLASH_MESSAGE_TYPES,
                 get parsed_hex() {
                     return firmwareFlashing.getParsedHex();
@@ -1705,6 +1744,11 @@ export default defineComponent({
 
         // Remote build and firmware loading
         const enforceOSDSelection = async () => {
+            // Skip OSD selection enforcement in core build mode
+            if (state.coreBuildMode) {
+                return true;
+            }
+
             const selectedRelease = boardSelection.state.selectedFirmwareVersion || "";
             const selectedFirmware = boardSelection.state.firmwareVersionOptions?.find(
                 (option) => option.release === selectedRelease,
@@ -1743,7 +1787,7 @@ export default defineComponent({
                 selectedOsdProtocol: state.selectedOsdProtocol,
                 selectedMotorProtocol: state.selectedMotorProtocol,
                 expertMode: state.expertMode,
-                selectedCommit: state.selectedCommit,
+                selectedCommit: state.selectedCommit?.value,
                 customDefinesInput: customDefinesInput.value,
                 isConfigLocal: state.isConfigLocal,
             };
@@ -1855,11 +1899,45 @@ export default defineComponent({
             state.selectedCommit = value;
         };
 
+        const onCommitTag = (searchQuery) => {
+            // Handle custom PR number or commit hash input
+            if (!searchQuery) {
+                return;
+            }
+
+            const formattedValue = searchQuery.trim();
+
+            // Prevent empty/whitespace submissions
+            if (!formattedValue) {
+                return;
+            }
+
+            // Check if it's a PR number (with or without #)
+            const prMatch = formattedValue.match(/^#?(\d+)$/);
+            if (prMatch) {
+                // Format as PR branch reference
+                const prNumber = prMatch[1];
+                const newOption = {
+                    label: `PR #${prNumber}`,
+                    value: `pull/${prNumber}/head`,
+                };
+                state.commitOptions.push(newOption);
+                state.selectedCommit = newOption;
+            } else {
+                // Treat as commit hash or branch name
+                const newOption = {
+                    label: formattedValue,
+                    value: formattedValue,
+                };
+                state.commitOptions.push(newOption);
+                state.selectedCommit = newOption;
+            }
+        };
+
         // UI State change handlers
         const handleExpertModeChange = () => {
             setConfig({ expertMode: state.expertMode });
             state.expertOptionsVisible = state.expertMode;
-            state.hideInCoreBuildMode = !state.coreBuildMode;
 
             // Update build types based on expert mode
             if (state.expertMode) {
@@ -1921,15 +1999,6 @@ export default defineComponent({
         const handleFlashManualBaudRateChange = () => {
             const baud = Number.parseInt(state.flashManualBaudRate);
             setConfig({ flash_manual_baud_rate: baud });
-        };
-
-        const handleCoreBuildModeChange = () => {
-            state.hideInCoreBuildMode = !state.coreBuildMode;
-            if (state.coreBuildMode) {
-                state.expertOptionsVisible = false;
-            } else {
-                state.expertOptionsVisible = state.expertMode;
-            }
         };
 
         // Click event handlers for buttons
@@ -2205,6 +2274,7 @@ export default defineComponent({
             targetMCUSpan,
             releaseDateSpan,
             configFilenameSpan,
+            requestDfuPermission,
             cloudTargetInfoDiv,
             cloudTargetLogLink,
             cloudTargetStatusSpan,
@@ -2233,13 +2303,13 @@ export default defineComponent({
             onMotorProtocolChange,
             onOptionsChange,
             onCommitChange,
+            onCommitTag,
             handleExpertModeChange,
             handleShowDevelopmentReleasesChange,
             handleNoRebootChange,
             handleEraseChipChange,
             handleFlashManualBaudChange,
             handleFlashManualBaudRateChange,
-            handleCoreBuildModeChange,
             handleExitDfu,
             handleFlashFirmware,
             handleLoadRemoteFile,
@@ -3258,6 +3328,27 @@ export default defineComponent({
     content: "– " !important;
     margin-right: 0.5rem !important;
     color: var(--text) !important;
+}
+
+/* DFU permission button accent styling */
+.dfu-auth-request {
+    text-align: center;
+    margin-top: 16px;
+}
+
+.dfu-auth-request .dfu-permission {
+    background: var(--success-600, var(--primary-500)) !important;
+    border-color: var(--success-600, var(--primary-500)) !important;
+    color: var(--text-high, var(--black)) !important;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2) inset;
+}
+
+.dfu-auth-request .dfu-permission:hover {
+    filter: brightness(0.95);
+}
+
+.dfu-auth-request p {
+    margin-bottom: 8px !important;
 }
 
 /* Unstable firmware dialog content styling */

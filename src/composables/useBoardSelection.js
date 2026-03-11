@@ -43,6 +43,7 @@ export function useBoardSelection(params) {
         selectedBoard: undefined,
         firmwareVersionOptions: [],
         selectedFirmwareVersion: undefined,
+        cloudBuildOptions: [],
     });
 
     /**
@@ -68,7 +69,7 @@ export function useBoardSelection(params) {
                 const orderB = groupOrder[b] ?? 999;
                 return orderA - orderB;
             })
-            .map(([key, data]) => ({
+            .map(([_key, data]) => ({
                 name: data.label,
                 boards: data.boards.sort((a, b) => a.target.localeCompare(b.target)),
             }));
@@ -231,6 +232,8 @@ export function useBoardSelection(params) {
                     state.selectedBoard = null;
                     await nextTick();
                     state.selectedBoard = found;
+                    // Always sync from AutoDetect
+                    state.cloudBuildOptions = AutoDetect.cloudBuildOptions || [];
                     await nextTick();
                     await onBoardChange();
                     return true;
@@ -249,6 +252,7 @@ export function useBoardSelection(params) {
         state.selectedBoard = undefined;
         state.boardOptions = [];
         state.firmwareVersionOptions = [];
+        state.cloudBuildOptions = [];
     };
 
     return {

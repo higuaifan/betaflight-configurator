@@ -722,10 +722,8 @@
 
 <script>
 import { defineComponent, ref, reactive, onMounted, computed, nextTick, watch, onUnmounted } from "vue";
-import { useConnectionStore } from "@/stores/connection";
 import { useNavigationStore } from "@/stores/navigation";
 import { useFlightControllerStore } from "@/stores/fc";
-import { useDialog } from "@/composables/useDialog";
 import { useReboot } from "@/composables/useReboot";
 import GUI from "../../js/gui";
 import MSP from "../../js/msp";
@@ -748,10 +746,8 @@ export default defineComponent({
     },
     setup() {
         // Reactive State
-        const connectionStore = useConnectionStore();
         const navigationStore = useNavigationStore();
         const fcStore = useFlightControllerStore();
-        const dialog = useDialog();
         const { reboot } = useReboot();
 
         // Helper to perform reboot after save
@@ -830,10 +826,13 @@ export default defineComponent({
         const hasDualGyros = ref(false);
         const showMultiGyro = ref(false); // API 1.47+ multi-gyro UI
 
+        // Sensor types - populated asynchronously
+        const sensorTypesData = ref(null);
+
         const gyroList = computed(() => {
             if (!showMultiGyro.value) return [];
 
-            const types = sensorTypes().gyro.elements;
+            const types = sensorTypesData.value?.gyro.elements || [];
             const detectedHardware = fcStore.gyroSensor?.gyro_hardware || [];
 
             // Use actual detected hardware count
@@ -958,6 +957,24 @@ export default defineComponent({
         const dshotBeaconTone = ref(0); // 0 = disabled
         const beeperDisabledMask = ref(0);
         const dshotDisabledMask = ref(0);
+
+        const syncBeeperStateFromStore = () => {
+            if (!fcStore.beepers) {
+                return;
+            }
+
+            if (fcStore.beepers.dshotBeaconTone != null) {
+                dshotBeaconTone.value = fcStore.beepers.dshotBeaconTone;
+            }
+
+            if (fcStore.beepers.beepers) {
+                beeperDisabledMask.value = fcStore.beepers.beepers._beeperDisabledMask;
+            }
+
+            if (fcStore.beepers.dshotBeaconConditions) {
+                dshotDisabledMask.value = fcStore.beepers.dshotBeaconConditions._beeperDisabledMask;
+            }
+        };
 
         const featureMask = computed(() => {
             if (!fcStore.features?.features) {
@@ -1157,7 +1174,7 @@ export default defineComponent({
 
                 if (!isMounted.value) return;
 
-                initializeUI();
+                await initializeUI();
                 await nextTick();
                 GUI.switchery();
                 GUI.content_ready();
@@ -1167,7 +1184,18 @@ export default defineComponent({
             }
         };
 
-        const initializeUI = () => {
+        const initializeUI = async () => {
+            // Keep beeper state synced even if later async setup fails.
+            syncBeeperStateFromStore();
+
+            // Sensor list lookup can fail on some FC/API combinations; continue with defaults.
+            try {
+                sensorTypesData.value = await sensorTypes();
+            } catch (error) {
+                sensorTypesData.value = null;
+                console.warn("Failed to load sensor types", error);
+            }
+
             // Populate Reactive State
             pidAdvancedConfig.pid_process_denom = fcStore.pidAdvancedConfig.pid_process_denom;
 
@@ -1196,17 +1224,6 @@ export default defineComponent({
             updateGyroDenom(fcStore.config.sampleRateHz);
 
             updatePidDenomOptions();
-
-            // Load DShot Tone
-            if (fcStore.beepers) {
-                dshotBeaconTone.value = fcStore.beepers.dshotBeaconTone;
-                if (fcStore.beepers.beepers) {
-                    beeperDisabledMask.value = fcStore.beepers.beepers._beeperDisabledMask;
-                }
-                if (fcStore.beepers.dshotBeaconConditions) {
-                    dshotDisabledMask.value = fcStore.beepers.dshotBeaconConditions._beeperDisabledMask;
-                }
-            }
 
             // Arming Config
             armingConfig.small_angle = fcStore.armingConfig.small_angle;
@@ -1291,12 +1308,11 @@ export default defineComponent({
 
             // Rangefinder / Optical Flow (API 1.47+)
             if (semver.gte(fcStore.config.apiVersion, API_VERSION_1_47)) {
-                const types = sensorTypes();
-                sonarTypesList.value = types.sonar.elements;
-                showRangefinder.value = sonarTypesList.value?.length > 0;
+                sonarTypesList.value = sensorTypesData.value?.sonar.elements || [];
+                showRangefinder.value = sonarTypesList.value.length > 0;
 
-                opticalFlowTypesList.value = types.opticalflow.elements;
-                showOpticalFlow.value = opticalFlowTypesList.value?.length > 0;
+                opticalFlowTypesList.value = sensorTypesData.value?.opticalflow.elements || [];
+                showOpticalFlow.value = opticalFlowTypesList.value.length > 0;
             }
         };
 

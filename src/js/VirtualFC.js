@@ -95,6 +95,8 @@ const VirtualFC = {
                 },
                 adjustmentFunction: 0,
                 auxSwitchChannelIndex: 0,
+                adjustmentCenter: 0,
+                adjustmentScale: 0,
             };
         }
 
@@ -307,6 +309,7 @@ const VirtualFC = {
 
         virtualOSD.data.state = {
             haveMax7456Configured: true,
+            haveMax7456Video: true,
             haveOsdFeature: true,
             haveMax7456FontDeviceConfigured: true,
             isMax7456FontDeviceDetected: true,

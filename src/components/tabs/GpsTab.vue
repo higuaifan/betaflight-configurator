@@ -351,7 +351,7 @@ export default defineComponent({
 
         const signalRows = ref([]);
 
-        const gpsProtocols = sensorTypes().gps.elements;
+        const gpsProtocols = ref([]);
         const gpsSbas = [
             i18n.getMessage("gpsSbasAutoDetect"),
             i18n.getMessage("gpsSbasEuropeanEGNOS"),
@@ -360,6 +360,11 @@ export default defineComponent({
             i18n.getMessage("gpsSbasIndianGAGAN"),
             i18n.getMessage("gpsSbasNone"),
         ];
+
+        const updateGpsProtocols = async () => {
+            const types = await sensorTypes();
+            gpsProtocols.value = types.gps.elements;
+        };
 
         const apiVersion = computed(() => fcStore.config.apiVersion);
         const hasGpsSensor = computed(() => have_sensor(fcStore.config.activeSensors, "gps"));
@@ -376,11 +381,11 @@ export default defineComponent({
             home_point_once: 0,
         });
 
-        const ubloxIndex = gpsProtocols.indexOf("UBLOX");
-        const mspIndex = gpsProtocols.indexOf("MSP");
+        const ubloxIndex = computed(() => gpsProtocols.value.indexOf("UBLOX"));
+        const mspIndex = computed(() => gpsProtocols.value.indexOf("MSP"));
 
-        const ubloxSelected = computed(() => gpsConfig.provider === ubloxIndex);
-        const mspSelected = computed(() => gpsConfig.provider === mspIndex);
+        const ubloxSelected = computed(() => gpsConfig.provider === ubloxIndex.value);
+        const mspSelected = computed(() => gpsConfig.provider === mspIndex.value);
         const showAutoConfig = computed(() => ubloxSelected.value);
         const showAutoBaud = computed(
             () => (ubloxSelected.value || mspSelected.value) && semver.lt(apiVersion.value, API_VERSION_1_46),
@@ -734,6 +739,8 @@ export default defineComponent({
 
                 Object.assign(gpsConfig, fcStore.gpsConfig || {});
 
+                await updateGpsProtocols();
+
                 isOnline.value = ispConnected();
                 isWaiting.value = true;
                 showMap.value = false;
@@ -801,6 +808,16 @@ export default defineComponent({
             navigationStore.cleanup(teardown);
         });
 
+        watch(
+            () => fcStore.features?.features?._features,
+            () => {
+                applySwitchery();
+            },
+            { deep: true, immediate: true },
+        );
+
+        watch([showAutoConfig, showUbloxGalileo, showAutoBaud], applySwitchery, { immediate: true });
+
         watch(showLoadMap, (visible) => {
             if (visible) {
                 nextTick(() => {
@@ -816,7 +833,6 @@ export default defineComponent({
                 });
             }
         });
-        watch([showAutoConfig, showUbloxGalileo, showAutoBaud], applySwitchery, { immediate: true });
 
         return {
             mapRef,
