@@ -29,6 +29,8 @@ export function sensorTypes() {
                 "BMI270",
                 "LSM6DSO",
                 "LSM6DSV16X",
+                "IIM42652",
+                "ICM42631",
                 "VIRTUAL",
             ],
         },
@@ -55,6 +57,8 @@ export function sensorTypes() {
                 "BMI270",
                 "LSM6DSO",
                 "LSM6DSV16X",
+                "IIM42652",
+                "ICM42631",
                 "VIRTUAL",
             ],
         },
@@ -111,7 +115,13 @@ export function sensorTypes() {
     if (semver.gte(FC.CONFIG.apiVersion, API_VERSION_1_47)) {
         removeArrayElement(gyroElements, "L3G4200D");
         removeArrayElement(gyroElements, "MPU3050");
-        addArrayElementsAfter(gyroElements, "LSM6DSV16X", ["IIM42653", "ICM45605", "ICM45686", "ICM40609D", "IIM42652"]);
+        addArrayElementsAfter(gyroElements, "LSM6DSV16X", [
+            "IIM42653",
+            "ICM45605",
+            "ICM45686",
+            "ICM40609D",
+            "IIM42652",
+        ]);
 
         removeArrayElement(accElements, "ADXL345");
         removeArrayElement(accElements, "MMA8452");
