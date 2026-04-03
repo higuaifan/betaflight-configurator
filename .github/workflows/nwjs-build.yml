@@ -26,7 +26,7 @@ jobs:
           $osName = "win64"
           $cacheRoot = "cache/$version-$flavor/$osName"
           $zip = "nwjs-v$version-$plat-$arch.zip"
-          $releaseUrl = "https://github.com/higuaifan/betaflight-configurator/releases/download/nwjs-cache/$zip"
+          $releaseUrl = "https://dl.nwjs.io/v$version/$zip"
           New-Item -ItemType Directory -Force $cacheRoot | Out-Null
           $dest = Join-Path $cacheRoot $zip
           if (-Not (Test-Path $dest)) {
