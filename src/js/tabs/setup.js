@@ -320,8 +320,8 @@ setup.initialize = function (callback) {
                 'BMI270',
                 'LSM6DSO',
                 'LSM6DSV16X',
-                'IIM42652',
                 'ICM42631',
+                'IIM42652',
                 'VIRTUAL',
             ];
 
@@ -347,8 +347,8 @@ setup.initialize = function (callback) {
                 'BMI270',
                 'LSM6DSO',
                 'LSM6DSV16X',
-                'IIM42652',
                 'ICM42631',
+                'IIM42652',
                 'VIRTUAL',
             ];
 
